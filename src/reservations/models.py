@@ -55,6 +55,7 @@ class Reservation(models.Model):
     ends_at = models.DateTimeField()
     internal_note = models.TextField(blank=True)
     cancel_reason = models.TextField(blank=True)
+    hold_reason = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
