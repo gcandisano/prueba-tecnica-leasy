@@ -9,3 +9,8 @@ class InvalidCredentialsError(AuthError):
 class InvalidTokenError(AuthError):
     code = "auth_invalid_token"
     detail = "Invalid access token."
+
+
+class AuthenticationRequiredError(AuthError):
+    code = "auth_required"
+    detail = "Authentication credentials were not provided."

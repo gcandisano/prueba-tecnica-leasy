@@ -5,12 +5,15 @@ from uuid import UUID
 from django.db import transaction
 
 from reservations.constants import (
+    RESERVATION_CANCELLABLE_STATUSES,
     RESERVATION_HOLDABLE_STATUSES,
+    RESERVATION_STATUS_CANCELLED,
     RESERVATION_STATUS_CONFIRMED,
     RESERVATION_STATUS_ON_HOLD,
     RESERVATION_STATUS_REQUESTED,
 )
 from reservations.exceptions import (
+    ReservationCancelReasonRequiredError,
     ReservationHoldReasonRequiredError,
     ReservationNotFoundError,
     ReservationStatusTransitionError,
@@ -97,12 +100,44 @@ class ReservationLifecycleService:
         reservation.save(update_fields=["status", "hold_reason", "updated_at"])
         return reservation
 
-    def _get_reservation_for_update(self, *, reservation_id: UUID) -> Reservation:
+    @transaction.atomic
+    def cancel_customer_reservation(
+        self,
+        *,
+        reservation_id: UUID,
+        customer_id: UUID,
+        reason: str,
+    ) -> Reservation:
+        reason = (reason or "").strip()
+        if not reason:
+            raise ReservationCancelReasonRequiredError()
+
+        reservation = self._get_reservation_for_update(
+            reservation_id=reservation_id,
+            customer_id=customer_id,
+        )
+
+        if reservation.status not in RESERVATION_CANCELLABLE_STATUSES:
+            raise ReservationStatusTransitionError()
+
+        reservation.status = RESERVATION_STATUS_CANCELLED
+        reservation.cancel_reason = reason
+        reservation.save(update_fields=["status", "cancel_reason", "updated_at"])
+        return reservation
+
+    def _get_reservation_for_update(
+        self,
+        *,
+        reservation_id: UUID,
+        customer_id: UUID | None = None,
+    ) -> Reservation:
+        queryset = Reservation.objects.select_for_update().select_related(
+            "customer__user", "room"
+        )
+        if customer_id is not None:
+            queryset = queryset.filter(customer_id=customer_id)
+
         try:
-            return (
-                Reservation.objects.select_for_update()
-                .select_related("customer__user", "room")
-                .get(pk=reservation_id)
-            )
+            return queryset.get(pk=reservation_id)
         except Reservation.DoesNotExist as exc:
             raise ReservationNotFoundError() from exc

@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Annotated
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StringConstraints
 
 
 class ProblemDetailSchema(BaseModel):
@@ -60,3 +61,10 @@ class ReservationListItem(BaseModel):
     starts_at: datetime
     ends_at: datetime
     cancel_reason: str | None = None
+
+
+class CancelReservationRequest(BaseModel):
+    reason: Annotated[
+        str,
+        StringConstraints(strip_whitespace=True, min_length=1, max_length=1000),
+    ]

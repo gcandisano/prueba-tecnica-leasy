@@ -19,3 +19,8 @@ class ReservationStatusTransitionError(ReservationError):
 class ReservationHoldReasonRequiredError(ReservationError):
     code = "reservation_hold_reason_required"
     detail = "A reason is required to put a reservation on hold."
+
+
+class ReservationCancelReasonRequiredError(ReservationError):
+    code = "reservation_cancel_reason_required"
+    detail = "A reason is required to cancel a reservation."

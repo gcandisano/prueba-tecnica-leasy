@@ -9,12 +9,13 @@ from reservations.constants import (
     RESERVATION_STATUS_REQUESTED,
 )
 from reservations.exceptions import (
+    ReservationCancelReasonRequiredError,
     ReservationHoldReasonRequiredError,
     ReservationNotFoundError,
     ReservationStatusTransitionError,
 )
 from reservations.services import ReservationLifecycleService
-from reservations.tests.factories import ReservationFactory
+from reservations.tests.factories import CustomerFactory, ReservationFactory
 
 
 @pytest.mark.django_db
@@ -94,3 +95,70 @@ def test_hold_reservation_raises_not_found_for_unknown_id():
             reservation_id=uuid.uuid4(),
             reason="Any reason.",
         )
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "initial_status",
+    [
+        RESERVATION_STATUS_REQUESTED,
+        RESERVATION_STATUS_CONFIRMED,
+        RESERVATION_STATUS_ON_HOLD,
+    ],
+)
+def test_cancel_customer_reservation_cancels_and_stores_reason(initial_status):
+    reservation = ReservationFactory(status=initial_status)
+
+    ReservationLifecycleService().cancel_customer_reservation(
+        reservation_id=reservation.id,
+        customer_id=reservation.customer_id,
+        reason="  Plans changed.  ",
+    )
+
+    reservation.refresh_from_db()
+    assert reservation.status == RESERVATION_STATUS_CANCELLED
+    assert reservation.cancel_reason == "Plans changed."
+
+
+@pytest.mark.django_db
+def test_cancel_customer_reservation_rejects_already_cancelled():
+    reservation = ReservationFactory(status=RESERVATION_STATUS_CANCELLED)
+
+    with pytest.raises(ReservationStatusTransitionError):
+        ReservationLifecycleService().cancel_customer_reservation(
+            reservation_id=reservation.id,
+            customer_id=reservation.customer_id,
+            reason="Plans changed.",
+        )
+
+
+@pytest.mark.django_db
+def test_cancel_customer_reservation_hides_reservations_of_other_customers():
+    reservation = ReservationFactory(status=RESERVATION_STATUS_REQUESTED)
+    other_customer = CustomerFactory()
+
+    with pytest.raises(ReservationNotFoundError):
+        ReservationLifecycleService().cancel_customer_reservation(
+            reservation_id=reservation.id,
+            customer_id=other_customer.id,
+            reason="Plans changed.",
+        )
+
+    reservation.refresh_from_db()
+    assert reservation.status == RESERVATION_STATUS_REQUESTED
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("reason", ["", "   "])
+def test_cancel_customer_reservation_requires_reason(reason):
+    reservation = ReservationFactory(status=RESERVATION_STATUS_REQUESTED)
+
+    with pytest.raises(ReservationCancelReasonRequiredError):
+        ReservationLifecycleService().cancel_customer_reservation(
+            reservation_id=reservation.id,
+            customer_id=reservation.customer_id,
+            reason=reason,
+        )
+
+    reservation.refresh_from_db()
+    assert reservation.status == RESERVATION_STATUS_REQUESTED
