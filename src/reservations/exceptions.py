@@ -14,3 +14,8 @@ class ReservationNotFoundError(ReservationError):
 class ReservationStatusTransitionError(ReservationError):
     code = "reservation_invalid_transition"
     detail = "Reservation cannot transition from its current status."
+
+
+class ReservationHoldReasonRequiredError(ReservationError):
+    code = "reservation_hold_reason_required"
+    detail = "A reason is required to put a reservation on hold."

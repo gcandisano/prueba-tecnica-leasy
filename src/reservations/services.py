@@ -5,10 +5,13 @@ from uuid import UUID
 from django.db import transaction
 
 from reservations.constants import (
+    RESERVATION_HOLDABLE_STATUSES,
     RESERVATION_STATUS_CONFIRMED,
+    RESERVATION_STATUS_ON_HOLD,
     RESERVATION_STATUS_REQUESTED,
 )
 from reservations.exceptions import (
+    ReservationHoldReasonRequiredError,
     ReservationNotFoundError,
     ReservationStatusTransitionError,
 )
@@ -62,14 +65,7 @@ class ReservationLifecycleService:
         actor_id: int | None = None,
     ) -> Reservation:
         _ = actor_id
-        try:
-            reservation = (
-                Reservation.objects.select_for_update()
-                .select_related("customer__user", "room")
-                .get(pk=reservation_id)
-            )
-        except Reservation.DoesNotExist as exc:
-            raise ReservationNotFoundError() from exc
+        reservation = self._get_reservation_for_update(reservation_id=reservation_id)
 
         if reservation.status != RESERVATION_STATUS_REQUESTED:
             raise ReservationStatusTransitionError()
@@ -77,3 +73,36 @@ class ReservationLifecycleService:
         reservation.status = RESERVATION_STATUS_CONFIRMED
         reservation.save(update_fields=["status", "updated_at"])
         return reservation
+
+    @transaction.atomic
+    def hold_reservation(
+        self,
+        *,
+        reservation_id: UUID,
+        reason: str,
+        actor_id: int | None = None,
+    ) -> Reservation:
+        _ = actor_id
+        reason = (reason or "").strip()
+        if not reason:
+            raise ReservationHoldReasonRequiredError()
+
+        reservation = self._get_reservation_for_update(reservation_id=reservation_id)
+
+        if reservation.status not in RESERVATION_HOLDABLE_STATUSES:
+            raise ReservationStatusTransitionError()
+
+        reservation.status = RESERVATION_STATUS_ON_HOLD
+        reservation.hold_reason = reason
+        reservation.save(update_fields=["status", "hold_reason", "updated_at"])
+        return reservation
+
+    def _get_reservation_for_update(self, *, reservation_id: UUID) -> Reservation:
+        try:
+            return (
+                Reservation.objects.select_for_update()
+                .select_related("customer__user", "room")
+                .get(pk=reservation_id)
+            )
+        except Reservation.DoesNotExist as exc:
+            raise ReservationNotFoundError() from exc
