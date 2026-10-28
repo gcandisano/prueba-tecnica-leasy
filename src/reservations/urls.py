@@ -3,6 +3,7 @@ from django.urls import path
 from reservations.views import (
     ReservationConfirmView,
     ReservationDetailView,
+    ReservationHoldView,
     ReservationListView,
     ReservationUpdateView,
 )
@@ -16,4 +17,5 @@ urlpatterns = [
         ReservationConfirmView.as_view(),
         name="reservation_confirm",
     ),
+    path("<uuid:pk>/hold/", ReservationHoldView.as_view(), name="reservation_hold"),
 ]

@@ -35,3 +35,11 @@ class ReservationUpdateForm(forms.ModelForm):
             )
 
         return cleaned_data
+
+
+class ReservationHoldForm(forms.Form):
+    reason = forms.CharField(
+        label="Motivo",
+        max_length=1000,
+        widget=forms.Textarea(attrs={"rows": 3}),
+    )

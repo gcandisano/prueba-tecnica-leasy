@@ -6,7 +6,9 @@ from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views import View
 
-from reservations.forms import ReservationUpdateForm
+from reservations.constants import RESERVATION_HOLDABLE_STATUSES
+from reservations.exceptions import ReservationError
+from reservations.forms import ReservationHoldForm, ReservationUpdateForm
 from reservations.models import Reservation
 from reservations.services import ReservationLifecycleService, ReservationUpdateService
 from shared.mixins import AuthenticatedPermissionRequiredMixin
@@ -40,6 +42,10 @@ class ReservationDetailView(
             {
                 "reservation": reservation,
                 "can_change": request.user.has_perm("reservations.change_reservation"),
+                "can_hold": (
+                    request.user.has_perm("reservations.hold_reservation")
+                    and reservation.status in RESERVATION_HOLDABLE_STATUSES
+                ),
             },
         )
 
@@ -92,3 +98,47 @@ class ReservationConfirmView(
         )
         messages.success(request, "Reserva confirmada.")
         return redirect("reservation_detail", pk=pk)
+
+
+class ReservationHoldView(
+    LoginRequiredMixin, AuthenticatedPermissionRequiredMixin, View
+):
+    permission_required = "reservations.hold_reservation"
+
+    def get(self, request: HttpRequest, pk) -> HttpResponse:
+        reservation = get_object_or_404(
+            Reservation.objects.select_related("customer__user", "room"),
+            pk=pk,
+        )
+        form = ReservationHoldForm()
+        return render(
+            request,
+            "reservations/hold.html",
+            {"reservation": reservation, "form": form},
+        )
+
+    def post(self, request: HttpRequest, pk) -> HttpResponse:
+        reservation = get_object_or_404(
+            Reservation.objects.select_related("customer__user", "room"),
+            pk=pk,
+        )
+        form = ReservationHoldForm(request.POST)
+        if not form.is_valid():
+            return render(
+                request,
+                "reservations/hold.html",
+                {"reservation": reservation, "form": form},
+                status=422,
+            )
+
+        try:
+            ReservationLifecycleService().hold_reservation(
+                reservation_id=reservation.id,
+                reason=form.cleaned_data["reason"],
+                actor_id=request.user.id,
+            )
+        except ReservationError as exc:
+            messages.error(request, exc.detail)
+        else:
+            messages.success(request, "Reserva puesta en espera.")
+        return redirect("reservation_detail", pk=reservation.id)

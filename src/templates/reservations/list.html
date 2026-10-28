@@ -27,7 +27,7 @@
                     <td>{{ reservation.customer.display_name }}</td>
                     <td>{{ reservation.room.name }}</td>
                     <td>{{ reservation.starts_at }}</td>
-                    <td><span class="badge">{{ reservation.get_status_display }}</span></td>
+                    <td><span class="badge badge--{{ reservation.status }}">{{ reservation.get_status_display }}</span></td>
                     <td>
                         <div class="actions">
                             <a class="btn" href="{% url 'reservation_detail' reservation.id %}">Ver</a>

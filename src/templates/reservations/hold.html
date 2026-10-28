@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}Poner reserva en espera{% endblock %}
+
+{% block content %}
+    <div class="card" style="max-width:760px;">
+        <div class="topbar" style="margin-bottom:16px;">
+            <div>
+                <h2 style="margin:0;">Poner reserva en espera</h2>
+                <p class="muted" style="margin:6px 0 0;">
+                    {{ reservation.customer.display_name }} · {{ reservation.room.name }} · {{ reservation.starts_at }}
+                </p>
+            </div>
+            <a class="btn" href="{% url 'reservation_detail' reservation.id %}">Volver</a>
+        </div>
+
+        <form method="post" class="stack">
+            {% csrf_token %}
+            {% for field in form %}
+                <div class="field">
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.errors %}
+                        <span class="muted">{{ field.errors|join:", " }}</span>
+                    {% endif %}
+                </div>
+            {% endfor %}
+            <div class="actions">
+                <button class="btn btn-danger" type="submit">Poner en espera</button>
+            </div>
+        </form>
+    </div>
+{% endblock %}

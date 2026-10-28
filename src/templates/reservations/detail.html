@@ -8,12 +8,14 @@
             <div class="topbar" style="margin-bottom:16px;">
                 <div>
                     <h2 style="margin:0;">Detalle de reserva</h2>
-                    <!-- Aquí el candidato agregará el flujo de ON_HOLD.-->
                 </div>
                 <div class="actions">
                     <a class="btn" href="{% url 'reservation_list' %}">Volver</a>
                     {% if can_change %}
                         <a class="btn" href="{% url 'reservation_edit' reservation.id %}">Editar</a>
+                    {% endif %}
+                    {% if can_hold %}
+                        <a class="btn" href="{% url 'reservation_hold' reservation.id %}">Poner en espera</a>
                     {% endif %}
                 </div>
             </div>
@@ -37,7 +39,7 @@
                 </div>
                 <div class="field">
                     <strong>Estado</strong>
-                    <span class="badge">{{ reservation.get_status_display }}</span>
+                    <span class="badge badge--{{ reservation.status }}">{{ reservation.get_status_display }}</span>
                 </div>
                 <div class="field">
                     <strong>Nota interna</strong>
@@ -46,6 +48,10 @@
                 <div class="field">
                     <strong>Motivo de cancelación</strong>
                     <span>{{ reservation.cancel_reason|default:"-" }}</span>
+                </div>
+                <div class="field">
+                    <strong>Motivo de espera</strong>
+                    <span>{{ reservation.hold_reason|default:"-" }}</span>
                 </div>
             </div>
         </div>
