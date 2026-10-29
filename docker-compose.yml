@@ -1,0 +1,30 @@
+services:
+  backend:
+    build: .
+    environment:
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-insecure-demo-secret-change-me}
+      API_JWT_SECRET: ${API_JWT_SECRET:-insecure-demo-jwt-secret-change-me}
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-false}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1}
+      DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS:-http://localhost:8000}
+      DJANGO_SEED_DEMO_DATA: ${DJANGO_SEED_DEMO_DATA:-true}
+      GUNICORN_WORKERS: ${GUNICORN_WORKERS:-2}
+    volumes:
+      - backend-data:/app/data
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    restart: unless-stopped
+
+  client:
+    build: ./client-app
+    environment:
+      BACKEND_URL: http://backend:8000
+    ports:
+      - "${CLIENT_PORT:-8080}:8080"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  backend-data:
