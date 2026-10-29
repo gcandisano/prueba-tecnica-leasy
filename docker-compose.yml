@@ -1,7 +1,24 @@
 services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-reservations}
+      POSTGRES_USER: ${POSTGRES_USER:-reservations}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-insecure-demo-db-password-change-me}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
   backend:
     build: .
     environment:
+      # Values come from .env (see .env.example); the fallbacks only make
+      # `docker compose up` work out of the box for the demo.
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-insecure-demo-secret-change-me}
       API_JWT_SECRET: ${API_JWT_SECRET:-insecure-demo-jwt-secret-change-me}
       DJANGO_DEBUG: ${DJANGO_DEBUG:-false}
@@ -9,10 +26,15 @@ services:
       DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS:-http://localhost:8000}
       DJANGO_SEED_DEMO_DATA: ${DJANGO_SEED_DEMO_DATA:-true}
       GUNICORN_WORKERS: ${GUNICORN_WORKERS:-2}
-    volumes:
-      - backend-data:/app/data
+      POSTGRES_HOST: db
+      POSTGRES_DB: ${POSTGRES_DB:-reservations}
+      POSTGRES_USER: ${POSTGRES_USER:-reservations}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-insecure-demo-db-password-change-me}
     ports:
       - "${BACKEND_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
     restart: unless-stopped
 
   client:
@@ -27,4 +49,4 @@ services:
     restart: unless-stopped
 
 volumes:
-  backend-data:
+  db-data:

@@ -22,13 +22,10 @@ ENV PATH=/opt/venv/bin:$PATH \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     DJANGO_DEBUG=false \
-    DJANGO_DB_PATH=/app/data/db.sqlite3 \
     GUNICORN_WORKERS=2
 
 RUN groupadd --system app \
-    && useradd --system --gid app --no-create-home --shell /usr/sbin/nologin app \
-    && mkdir -p /app/data \
-    && chown app:app /app/data
+    && useradd --system --gid app --no-create-home --shell /usr/sbin/nologin app
 
 WORKDIR /app
 
@@ -39,11 +36,10 @@ RUN chmod 0755 /usr/local/bin/backend-entrypoint
 
 USER app
 
-VOLUME ["/app/data"]
 EXPOSE 8000
 
 HEALTHCHECK --interval=10s --timeout=3s --start-period=20s --retries=5 \
     CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/accounts/login/', timeout=2)"]
 
 ENTRYPOINT ["backend-entrypoint"]
-CMD ["sh", "-c", "exec gunicorn config.wsgi:application --chdir src --bind 0.0.0.0:8000 --workers ${GUNICORN_WORKERS} --access-logfile -"]
+CMD ["sh", "-c", "exec gunicorn config.wsgi:application --chdir src --bind 0.0.0.0:8000 --workers ${GUNICORN_WORKERS} --no-control-socket --access-logfile -"]

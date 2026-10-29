@@ -1,6 +1,8 @@
+import threading
 import uuid
 
 import pytest
+from django.db import connection, transaction
 
 from reservations.constants import (
     RESERVATION_STATUS_CANCELLED,
@@ -162,3 +164,48 @@ def test_cancel_customer_reservation_requires_reason(reason):
 
     reservation.refresh_from_db()
     assert reservation.status == RESERVATION_STATUS_REQUESTED
+
+
+@pytest.mark.skipif(
+    connection.vendor != "postgresql",
+    reason="Needs row locks: SQLite ignores select_for_update.",
+)
+@pytest.mark.django_db(transaction=True)
+def test_cancel_customer_reservation_waits_for_concurrent_cancellation():
+    reservation = ReservationFactory(status=RESERVATION_STATUS_CONFIRMED)
+    service = ReservationLifecycleService()
+    second_request_errors = []
+
+    def cancel_from_second_request():
+        try:
+            service.cancel_customer_reservation(
+                reservation_id=reservation.id,
+                customer_id=reservation.customer_id,
+                reason="Second request.",
+            )
+        except Exception as exc:
+            second_request_errors.append(exc)
+        finally:
+            connection.close()
+
+    second_request = threading.Thread(target=cancel_from_second_request)
+    with transaction.atomic():
+        # The first request cancels but has not committed yet, so it still
+        # holds the row lock taken by select_for_update.
+        service.cancel_customer_reservation(
+            reservation_id=reservation.id,
+            customer_id=reservation.customer_id,
+            reason="First request.",
+        )
+        second_request.start()
+        second_request.join(timeout=0.5)
+        assert second_request.is_alive()
+
+    second_request.join(timeout=5)
+
+    assert not second_request.is_alive()
+    assert len(second_request_errors) == 1
+    assert isinstance(second_request_errors[0], ReservationStatusTransitionError)
+    reservation.refresh_from_db()
+    assert reservation.status == RESERVATION_STATUS_CANCELLED
+    assert reservation.cancel_reason == "First request."
