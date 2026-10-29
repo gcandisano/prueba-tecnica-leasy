@@ -11,8 +11,7 @@
 4. Guardan con `save(update_fields=...)`.
 
 Los estados de origen permitidos están en `constants.py`
-(`RESERVATION_HOLDABLE_STATUSES` y `RESERVATION_CANCELLABLE_STATUSES`), no
-repartidos en `if` por las vistas. La vista del backoffice usa la misma
+(`RESERVATION_HOLDABLE_STATUSES` y `RESERVATION_CANCELLABLE_STATUSES`). La vista del backoffice usa la misma
 constante para decidir si muestra el botón "Poner en espera", así que la UI y
 la regla no pueden divergir.
 
@@ -20,6 +19,8 @@ la regla no pueden divergir.
 `on_hold`. El cliente puede cancelar `requested`, `confirmed` y `on_hold`: si
 ya podía cancelar una reserva confirmada, no tiene sentido que una en espera
 quede bloqueada para él.
+
+
 
 ### El admin de Django tampoco puede saltarse el servicio
 
@@ -34,16 +35,11 @@ Marqué `status`, `hold_reason` y `cancel_reason` como `readonly_fields`. El
 admin los sigue mostrando, pero la única forma de cambiar un estado es el
 servicio, que es donde están las validaciones.
 
-no saqué el admin ni les quité el acceso a
-los operadores. El admin sigue siendo útil para editar datos que no tienen
-reglas (sala, fechas, nota interna), y cambiar quién entra es una decisión de
-operación, no de esta feature.
+
 
 ### Por qué pasamos de SQLite a PostgreSQL
 
-El escenario que nos preocupaba: dos requests (un doble click, o el backoffice
-poniendo en espera mientras el cliente cancela) leen la reserva como
-`confirmed` al mismo tiempo y las dos intentan cambiarla.
+El escenario que me preocupaba: dos requests (un doble click, o el backoffice poniendo en espera mientras el cliente cancela) leen la reserva como `confirmed` al mismo tiempo y las dos intentan cambiarla.
 
 - **Con SQLite**, `select_for_update()` no hace nada. El dato no se corrompe
 (SQLite deja escribir a una transacción por vez y rechaza a la que leyó un
@@ -55,7 +51,7 @@ request espera, cuando la primera commitea vuelve a leer, ve `cancelled` y
 responde **409** `reservation_invalid_transition`, que es lo que el cliente
 sabe mostrar.
 
-Lo verificamos de dos formas:
+Lo verique de dos formas:
 
 - `test_cancel_customer_reservation_waits_for_concurrent_cancellation` comprueba
 que la segunda cancelación queda esperando y termina en
@@ -64,9 +60,7 @@ que la segunda cancelación queda esperando y termina en
 segunda request **sí** cancela y pisa el motivo de la primera. O sea, en  
 Postgres el lock no es decorativo, es lo que evita la doble cancelación.
 
-Además, PostgreSQL es lo que usaríamos en producción: permite varias réplicas
-del backend contra la misma base y no depende de un archivo dentro de un
-volumen.
+Además, PostgreSQL es lo que usaría en producción: permite varias réplicas del backend contra la misma base y no depende de un archivo dentro de un volumen.
 
 - **Trade-off:** un contenedor más en compose y una dependencia nueva
 (`psycopg[binary]`). Uso la variante `binary` porque trae su propia `libpq` y
@@ -158,9 +152,7 @@ relativas a "ahora" y las duplica si se corre de nuevo. En vez de tocar el
 comando del starter, agregué `seed_demo_data_if_empty`, que solo lo llama si
 no hay reservas.
 - **Token en** `sessionStorage`**:** es accesible desde JavaScript, así que un XSS
-podría leerlo. Una cookie `httpOnly` sería más segura, pero implicaba cambiar
-la autenticación del API (que el contrato define con Bearer) y agregar CSRF.
-`sessionStorage` al menos se borra al cerrar la pestaña.
+podría leerlo. Una cookie `httpOnly` sería más segura, pero implicaba cambiar la autenticación del API (que el contrato define con Bearer) y agregar CSRF. 
 - **Actualización pesimista en el cliente:** la fila cambia a `cancelled`
 recién cuando responde el backend, usando la respuesta del servidor. Si el
 backend responde 404 o 409, la lista se vuelve a pedir, porque significa que
@@ -172,9 +164,27 @@ backoffice quedaría sin CSS sin agregar otro contenedor) y `psycopg[binary]`
 
 
 
+## Cosas que identifiqué pero no implementé
+
+Mientras trabajaba en la prueba identifiqué varias reglas de negocio, que un sistema real de reservas necesitaría. No las implementé porque no iban directamente de la mano de la consigna, y agregarlas habría ampliado el alcance sobre código del starter que no se pedía cambiar. Dejo documentadas algunas junto con cómo las encararía.
+
+- **No se puede sacar una reserva de** `on_hold`**:** `confirm_reservation` solo
+acepta `requested`, así que una reserva en espera solo puede terminar
+cancelada por el cliente. Agregaría una transición `release_hold` en
+`ReservationLifecycleService`, con su propio permiso. Habría que decidir si
+vuelve a `requested` o al estado anterior; lo segundo requiere guardar el
+estado previo al poner en espera.
+- **El staff no puede cancelar ni rechazar:** desde el backoffice solo se puede
+confirmar o poner en espera; cancelar es exclusivo del cliente. Agregaría
+`cancel_reservation` para el staff, con permiso y motivo obligatorio,
+reutilizando `RESERVATION_CANCELLABLE_STATUSES`.
+- **La edición no mira el estado:** `ReservationUpdateView` permite cambiar  
+sala y fechas de una reserva cancelada. Movería la regla de qué estados son  
+editables a una constante y la validaría en `ReservationUpdateService`, igual  
+que las transiciones.
+
+
+
 ## Uso de IA
 
-Usé Claude Code (Anthropic) como asistente durante toda la prueba: para leer y
-analizar el starter, discutir alternativas, escribir código, tests y
-documentación, y para probar el stack con Docker. Revisé cada parte antes de
-commitearla y las decisiones de este documento las tomé yo.
+Usé Claude Code como asistente durante toda la prueba: para leer y analizar el starter, discutir alternativas, escribir código, tests y documentación. Revisé cada parte antes de commitearla y las decisiones de este documento las tomé yo.
