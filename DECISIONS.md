@@ -21,7 +21,23 @@ la regla no pueden divergir.
 ya podía cancelar una reserva confirmada, no tiene sentido que una en espera
 quede bloqueada para él.
 
+### El admin de Django tampoco puede saltarse el servicio
 
+El starter monta `/admin/`, y `ReservationAdmin` dejaba editar todos los
+campos. Un usuario staff con `change_reservation` pero **sin**
+`hold_reservation` (como `operator`) podía entrar al admin y poner una reserva
+en `on_hold` sin motivo, reactivar una cancelada o reescribir `hold_reason` y
+`cancel_reason`. Eso salteaba las tres reglas de la feature: el permiso, el
+motivo obligatorio y las transiciones válidas.
+
+Marqué `status`, `hold_reason` y `cancel_reason` como `readonly_fields`. El
+admin los sigue mostrando, pero la única forma de cambiar un estado es el
+servicio, que es donde están las validaciones.
+
+no saqué el admin ni les quité el acceso a
+los operadores. El admin sigue siendo útil para editar datos que no tienen
+reglas (sala, fechas, nota interna), y cambiar quién entra es una decisión de
+operación, no de esta feature.
 
 ### Por qué pasamos de SQLite a PostgreSQL
 
