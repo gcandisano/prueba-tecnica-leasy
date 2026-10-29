@@ -35,8 +35,6 @@ Marqué `status`, `hold_reason` y `cancel_reason` como `readonly_fields`. El
 admin los sigue mostrando, pero la única forma de cambiar un estado es el
 servicio, que es donde están las validaciones.
 
-
-
 ### Por qué pasamos de SQLite a PostgreSQL
 
 El escenario que me preocupaba: dos requests (un doble click, o el backoffice poniendo en espera mientras el cliente cancela) leen la reserva como `confirmed` al mismo tiempo y las dos intentan cambiarla.
@@ -51,7 +49,7 @@ request espera, cuando la primera commitea vuelve a leer, ve `cancelled` y
 responde **409** `reservation_invalid_transition`, que es lo que el cliente
 sabe mostrar.
 
-Lo verique de dos formas:
+Lo verifiqué de dos formas:
 
 - `test_cancel_customer_reservation_waits_for_concurrent_cancellation` comprueba
 que la segunda cancelación queda esperando y termina en
@@ -147,12 +145,10 @@ réplica alcanza. Con varias réplicas, todas correrían `migrate` a la vez, y
 `seed_demo_data_if_empty` (que chequea si hay datos y después siembra) podría
 sembrar dos veces. Ahí pasaría a un servicio `migrate` de una sola ejecución
 (`depends_on: condition: service_completed_successfully`).
-- **El seed no es idempotente:** `seed_assessment_data` crea reservas con fechas
-relativas a "ahora" y las duplica si se corre de nuevo. En vez de tocar el
-comando del starter, agregué `seed_demo_data_if_empty`, que solo lo llama si
+- **El seed no es idempotente:** `seed_assessment_data` crea reservas con fechas  
+relativas a "ahora" y las duplica si se corre de nuevo. En vez de tocar el  
+comando del starter, agregué `seed_demo_data_if_empty`, que solo lo llama si  
 no hay reservas.
-- **Token en** `sessionStorage`**:** es accesible desde JavaScript, así que un XSS
-podría leerlo. Una cookie `httpOnly` sería más segura, pero implicaba cambiar la autenticación del API (que el contrato define con Bearer) y agregar CSRF. 
 - **Actualización pesimista en el cliente:** la fila cambia a `cancelled`
 recién cuando responde el backend, usando la respuesta del servidor. Si el
 backend responde 404 o 409, la lista se vuelve a pedir, porque significa que
@@ -187,4 +183,4 @@ que las transiciones.
 
 ## Uso de IA
 
-Usé Claude Code como asistente durante toda la prueba: para leer y analizar el starter, discutir alternativas, escribir código, tests y documentación. Revisé cada parte antes de commitearla y las decisiones de este documento las tomé yo.
+Usé Claude Code como asistente durante toda la prueba: para leer y analizar el starter, discutir alternativas, escribir código, tests y documentación. Revisé cada parte antes de hacer el commit y las decisiones de este documento las tomé yo.

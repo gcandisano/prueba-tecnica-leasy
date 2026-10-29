@@ -20,7 +20,7 @@ El dominio es ficticio y está basado en reservas:
 
 ## Flujo de la prueba
 
-El assessment tiene dos partes:
+El assessment tiene tres partes:
 
 1. Extender el backoffice Django con una transición nueva de reservas.
 2. Construir una mini app cliente en `client-app/` para consumir el API.
